@@ -1,9 +1,9 @@
 package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.PageMemoryManager;
-import net.minecraft.client.gui.components.Button;
+import cc.spea.booktweaks.client.DoublePageButton;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.screens.inventory.PageButton;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -29,6 +29,12 @@ public abstract class BookEditScreenMixin {
     private List<String> pages;
 
     @Shadow
+    private PageButton forwardButton;
+
+    @Shadow
+    private PageButton backButton;
+
+    @Shadow
     protected abstract void updateButtonVisibility();
 
     @Shadow
@@ -49,19 +55,30 @@ public abstract class BookEditScreenMixin {
         ScreenAccessor accessor = (ScreenAccessor) this;
 
         int centerX = (screen.width - 192) / 2;
+        int buttonY = 159;
+        int buttonSpacing = 5;
 
-        // Add "Jump to Start" button (to the left of the back button)
+        // Reposition existing buttons to make room for jump buttons
+        // Original positions: back at centerX + 43, forward at centerX + 116
+        // New positions with 4 buttons evenly spaced:
+        // Jump to start, Back, Forward, Jump to end
+
+        int startX = centerX + 30;
+
+        // Move existing back button
+        backButton.setX(startX + 23 + buttonSpacing);
+
+        // Move existing forward button
+        forwardButton.setX(startX + (23 + buttonSpacing) * 2);
+
+        // Add "Jump to Start" button (double left arrow)
         accessor.invokeAddRenderableWidget(
-                Button.builder(Component.literal("<<"), button -> bookTweaks$jumpToStart())
-                        .bounds(centerX + 18, 159, 20, 20)
-                        .build()
+                new DoublePageButton(startX, buttonY, false, button -> bookTweaks$jumpToStart(), true)
         );
 
-        // Add "Jump to End" button (to the right of the forward button)
+        // Add "Jump to End" button (double right arrow)
         accessor.invokeAddRenderableWidget(
-                Button.builder(Component.literal(">>"), button -> bookTweaks$jumpToEnd())
-                        .bounds(centerX + 141, 159, 20, 20)
-                        .build()
+                new DoublePageButton(startX + (23 + buttonSpacing) * 3, buttonY, true, button -> bookTweaks$jumpToEnd(), true)
         );
 
         // Set initial page if not already set
