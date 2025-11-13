@@ -3,13 +3,12 @@
 	"id": "book-tweaks",
 	"version": "${version}",
 	"name": "Book Tweaks",
-	"description": "A client-side mod that adds utilities for writing books, including jump-to-start/end buttons and page memory.",
+	"description": "A client-side mod that adds utilities for books, including jump-to-start/end buttons and page memory.",
 	"authors": [
-		"Me!"
+		"R2bEEaton"
 	],
 	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
+		"sources": "https://github.com/R2bEEaton-Minecraft/book-tweaks"
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/book-tweaks/icon.png",
@@ -20,6 +19,9 @@
 		],
 		"client": [
 			"cc.spea.booktweaks.BookTweaksClient"
+		],
+		"modmenu": [
+			"cc.spea.booktweaks.ModMenuIntegration"
 		]
 	},
 	"mixins": [
