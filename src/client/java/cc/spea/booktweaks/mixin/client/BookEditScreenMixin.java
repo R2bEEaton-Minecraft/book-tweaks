@@ -93,7 +93,7 @@ public abstract class BookEditScreenMixin {
 
     /**
      * Set the initial page when opening the book.
-     * Writeable books default to the end if no page is remembered.
+     * Writeable books default to page 1 if no page is remembered.
      */
     @Unique
     private void bookTweaks$setInitialPage() {
@@ -103,8 +103,8 @@ public abstract class BookEditScreenMixin {
             // Jump to remembered page
             currentPage = Math.max(0, Math.min(rememberedPage, getNumPages() - 1));
         } else {
-            // Default to last page for writeable books
-            currentPage = Math.max(0, getNumPages() - 1);
+            // Default to first page for writeable books
+            currentPage = 0;
         }
 
         updatePageContent();
