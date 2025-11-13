@@ -46,6 +46,12 @@ public abstract class BookEditScreenMixin {
     @Unique
     private boolean bookTweaks$initialPageSet = false;
 
+    @Unique
+    private PageButton bookTweaks$jumpToStartButton;
+
+    @Unique
+    private PageButton bookTweaks$jumpToEndButton;
+
     /**
      * Inject into init method to add our custom buttons and set initial page.
      */
@@ -59,11 +65,8 @@ public abstract class BookEditScreenMixin {
         int buttonSpacing = 5;
 
         // Reposition existing buttons to make room for jump buttons
-        // Original positions: back at centerX + 43, forward at centerX + 116
-        // New positions with 4 buttons evenly spaced:
-        // Jump to start, Back, Forward, Jump to end
-
-        int startX = centerX + 30;
+        // Move 8 pixels to the right from original position
+        int startX = centerX + 38;
 
         // Move existing back button
         backButton.setX(startX + 23 + buttonSpacing);
@@ -72,12 +75,12 @@ public abstract class BookEditScreenMixin {
         forwardButton.setX(startX + (23 + buttonSpacing) * 2);
 
         // Add "Jump to Start" button (double left arrow)
-        accessor.invokeAddRenderableWidget(
+        bookTweaks$jumpToStartButton = accessor.invokeAddRenderableWidget(
                 new DoublePageButton(startX, buttonY, false, button -> bookTweaks$jumpToStart(), true)
         );
 
         // Add "Jump to End" button (double right arrow)
-        accessor.invokeAddRenderableWidget(
+        bookTweaks$jumpToEndButton = accessor.invokeAddRenderableWidget(
                 new DoublePageButton(startX + (23 + buttonSpacing) * 3, buttonY, true, button -> bookTweaks$jumpToEnd(), true)
         );
 
@@ -126,6 +129,19 @@ public abstract class BookEditScreenMixin {
         currentPage = Math.max(0, getNumPages() - 1);
         updatePageContent();
         updateButtonVisibility();
+    }
+
+    /**
+     * Update jump button visibility based on current page.
+     */
+    @Inject(method = "updateButtonVisibility", at = @At("TAIL"))
+    private void updateJumpButtonVisibility(CallbackInfo ci) {
+        if (bookTweaks$jumpToStartButton != null) {
+            bookTweaks$jumpToStartButton.visible = currentPage > 0;
+        }
+        if (bookTweaks$jumpToEndButton != null) {
+            bookTweaks$jumpToEndButton.visible = currentPage < getNumPages() - 1;
+        }
     }
 
     /**

@@ -42,6 +42,12 @@ public abstract class BookScreenMixin {
     @Unique
     private boolean bookTweaks$initialPageSet = false;
 
+    @Unique
+    private PageButton bookTweaks$jumpToStartButton;
+
+    @Unique
+    private PageButton bookTweaks$jumpToEndButton;
+
     /**
      * Capture the book ItemStack when the screen is constructed with a book.
      */
@@ -78,7 +84,8 @@ public abstract class BookScreenMixin {
         int buttonSpacing = 5;
 
         // Reposition existing buttons to make room for jump buttons
-        int startX = centerX + 30;
+        // Move 8 pixels to the right from original position
+        int startX = centerX + 38;
 
         // Move existing back button
         backButton.setX(startX + 23 + buttonSpacing);
@@ -87,12 +94,12 @@ public abstract class BookScreenMixin {
         forwardButton.setX(startX + (23 + buttonSpacing) * 2);
 
         // Add "Jump to Start" button (double left arrow)
-        accessor.invokeAddRenderableWidget(
+        bookTweaks$jumpToStartButton = accessor.invokeAddRenderableWidget(
                 new DoublePageButton(startX, buttonY, false, button -> bookTweaks$jumpToStart(), true)
         );
 
         // Add "Jump to End" button (double right arrow)
-        accessor.invokeAddRenderableWidget(
+        bookTweaks$jumpToEndButton = accessor.invokeAddRenderableWidget(
                 new DoublePageButton(startX + (23 + buttonSpacing) * 3, buttonY, true, button -> bookTweaks$jumpToEnd(), true)
         );
 
@@ -137,6 +144,19 @@ public abstract class BookScreenMixin {
     @Unique
     private void bookTweaks$jumpToEnd() {
         setPage(bookAccess.getPageCount() - 1);
+    }
+
+    /**
+     * Update jump button visibility based on current page.
+     */
+    @Inject(method = "updateButtonVisibility", at = @At("TAIL"))
+    private void updateJumpButtonVisibility(CallbackInfo ci) {
+        if (bookTweaks$jumpToStartButton != null) {
+            bookTweaks$jumpToStartButton.visible = currentPage > 0;
+        }
+        if (bookTweaks$jumpToEndButton != null) {
+            bookTweaks$jumpToEndButton.visible = currentPage < bookAccess.getPageCount() - 1;
+        }
     }
 
     /**
