@@ -1,6 +1,8 @@
 package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.PageMemoryManager;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.BookViewScreen;
 import net.minecraft.network.chat.Component;
@@ -25,12 +27,6 @@ public abstract class BookScreenMixin {
     @Shadow
     protected abstract void updateButtonVisibility();
 
-    @Shadow
-    protected abstract <T extends net.minecraft.client.gui.components.events.GuiEventListener & net.minecraft.client.gui.components.Renderable & net.minecraft.client.gui.narration.NarratableEntry> T addRenderableWidget(T widget);
-
-    @Shadow
-    public net.minecraft.client.Minecraft minecraft;
-
     @Unique
     private ItemStack bookTweaks$bookStack;
 
@@ -52,11 +48,13 @@ public abstract class BookScreenMixin {
     @Inject(method = "init", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
         BookViewScreen screen = (BookViewScreen) (Object) this;
+        ScreenAccessor accessor = (ScreenAccessor) this;
 
         // Try to get the book from player's hand
-        if (minecraft != null && minecraft.player != null) {
-            ItemStack mainHand = minecraft.player.getMainHandItem();
-            ItemStack offHand = minecraft.player.getOffhandItem();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null && mc.player != null) {
+            ItemStack mainHand = mc.player.getMainHandItem();
+            ItemStack offHand = mc.player.getOffhandItem();
 
             // Check which hand has a book
             if (mainHand != null && BookViewScreen.BookAccess.fromItem(mainHand) != null) {
@@ -67,14 +65,14 @@ public abstract class BookScreenMixin {
         }
 
         // Add "Jump to Start" button (left side)
-        addRenderableWidget(
+        accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal("<<"), button -> bookTweaks$jumpToStart())
                         .bounds(screen.width / 2 - 100 - 50, 196, 20, 20)
                         .build()
         );
 
         // Add "Jump to End" button (right side)
-        addRenderableWidget(
+        accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal(">>"), button -> bookTweaks$jumpToEnd())
                         .bounds(screen.width / 2 + 100 + 30, 196, 20, 20)
                         .build()
@@ -128,10 +126,30 @@ public abstract class BookScreenMixin {
     }
 
     /**
-     * Remember the current page when the book is closed.
+     * Remember the current page when navigating backward.
      */
-    @Inject(method = "removed", at = @At("HEAD"))
-    private void onRemoved(CallbackInfo ci) {
+    @Inject(method = "pageBack", at = @At("HEAD"))
+    private void onPageBack(CallbackInfo ci) {
+        if (bookTweaks$bookStack != null) {
+            PageMemoryManager.rememberPage(bookTweaks$bookStack, currentPage);
+        }
+    }
+
+    /**
+     * Remember the current page when navigating forward.
+     */
+    @Inject(method = "pageForward", at = @At("HEAD"))
+    private void onPageForward(CallbackInfo ci) {
+        if (bookTweaks$bookStack != null) {
+            PageMemoryManager.rememberPage(bookTweaks$bookStack, currentPage);
+        }
+    }
+
+    /**
+     * Remember the current page when rendering (saves periodically).
+     */
+    @Inject(method = "render", at = @At("HEAD"))
+    private void onRender(GuiGraphics guiGraphics, int i, int j, float f, CallbackInfo ci) {
         if (bookTweaks$bookStack != null) {
             PageMemoryManager.rememberPage(bookTweaks$bookStack, currentPage);
         }

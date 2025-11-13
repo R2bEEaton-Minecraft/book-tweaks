@@ -34,9 +34,6 @@ public abstract class BookEditScreenMixin {
     @Shadow
     protected abstract int getNumPages();
 
-    @Shadow
-    protected abstract <T extends net.minecraft.client.gui.components.events.GuiEventListener & net.minecraft.client.gui.components.Renderable & net.minecraft.client.gui.narration.NarratableEntry> T addRenderableWidget(T widget);
-
     @Unique
     private boolean bookTweaks$initialPageSet = false;
 
@@ -46,16 +43,17 @@ public abstract class BookEditScreenMixin {
     @Inject(method = "init", at = @At("TAIL"))
     private void onInit(CallbackInfo ci) {
         BookEditScreen screen = (BookEditScreen) (Object) this;
+        ScreenAccessor accessor = (ScreenAccessor) this;
 
         // Add "Jump to Start" button (left side)
-        addRenderableWidget(
+        accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal("<<"), button -> bookTweaks$jumpToStart())
                         .bounds(screen.width / 2 - 100 - 50, 196, 20, 20)
                         .build()
         );
 
         // Add "Jump to End" button (right side)
-        addRenderableWidget(
+        accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal(">>"), button -> bookTweaks$jumpToEnd())
                         .bounds(screen.width / 2 + 100 + 30, 196, 20, 20)
                         .build()
@@ -106,10 +104,10 @@ public abstract class BookEditScreenMixin {
     }
 
     /**
-     * Remember the current page when the book is closed.
+     * Remember the current page when the book is closed/saved.
      */
-    @Inject(method = "removed", at = @At("HEAD"))
-    private void onRemoved(CallbackInfo ci) {
+    @Inject(method = "saveChanges", at = @At("HEAD"))
+    private void onSave(CallbackInfo ci) {
         PageMemoryManager.rememberPage(book, currentPage);
     }
 }

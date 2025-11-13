@@ -4,7 +4,8 @@
 	"compatibilityLevel": "JAVA_21",
 	"client": [
 		"BookEditScreenMixin",
-		"BookScreenMixin"
+		"BookScreenMixin",
+		"ScreenAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1
