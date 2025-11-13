@@ -1,0 +1,12 @@
+{
+	"required": true,
+	"package": "cc.spea.booktweaks.mixin.client",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"BookEditScreenMixin",
+		"BookScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}
