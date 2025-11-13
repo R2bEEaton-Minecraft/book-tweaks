@@ -146,8 +146,9 @@ public abstract class BookEditScreenMixin {
 
     /**
      * Remember the current page when the book is closed/saved.
+     * Inject at TAIL to ensure the ItemStack is updated with new content first.
      */
-    @Inject(method = "saveChanges", at = @At("HEAD"))
+    @Inject(method = "saveChanges", at = @At("TAIL"))
     private void onSave(CallbackInfo ci) {
         PageMemoryManager.rememberPage(book, currentPage);
     }

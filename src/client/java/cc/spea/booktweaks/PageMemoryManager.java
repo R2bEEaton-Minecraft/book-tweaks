@@ -74,7 +74,14 @@ public class PageMemoryManager {
         // Check for writable book
         WritableBookContent writableBook = book.get(DataComponents.WRITABLE_BOOK_CONTENT);
         if (writableBook != null) {
-            id.append(writableBook.hashCode());
+            // Create a stable hash based on the actual page content
+            // This ensures the same content always produces the same ID
+            int contentHash = 0;
+            for (var page : writableBook.pages().stream().toList()) {
+                // Combine hashes using a stable algorithm (page.raw() gets the unfiltered text)
+                contentHash = 31 * contentHash + (page != null ? page.raw().hashCode() : 0);
+            }
+            id.append(contentHash);
             return id.toString();
         }
 
