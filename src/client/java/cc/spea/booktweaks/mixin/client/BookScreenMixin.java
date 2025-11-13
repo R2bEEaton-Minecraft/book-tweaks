@@ -27,6 +27,9 @@ public abstract class BookScreenMixin {
     @Shadow
     protected abstract void updateButtonVisibility();
 
+    @Shadow
+    public abstract boolean setPage(int i);
+
     @Unique
     private ItemStack bookTweaks$bookStack;
 
@@ -64,17 +67,19 @@ public abstract class BookScreenMixin {
             }
         }
 
-        // Add "Jump to Start" button (left side)
+        int centerX = (screen.width - 192) / 2;
+
+        // Add "Jump to Start" button (to the left of the back button)
         accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal("<<"), button -> bookTweaks$jumpToStart())
-                        .bounds(screen.width / 2 - 100 - 50, 196, 20, 20)
+                        .bounds(centerX + 18, 159, 20, 20)
                         .build()
         );
 
-        // Add "Jump to End" button (right side)
+        // Add "Jump to End" button (to the right of the forward button)
         accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal(">>"), button -> bookTweaks$jumpToEnd())
-                        .bounds(screen.width / 2 + 100 + 30, 196, 20, 20)
+                        .bounds(centerX + 141, 159, 20, 20)
                         .build()
         );
 
@@ -96,15 +101,13 @@ public abstract class BookScreenMixin {
 
             if (rememberedPage != null) {
                 // Jump to remembered page
-                currentPage = Math.max(0, Math.min(rememberedPage, bookAccess.getPageCount() - 1));
-                updateButtonVisibility();
+                setPage(rememberedPage);
                 return;
             }
         }
 
         // Default to first page for written books
-        currentPage = 0;
-        updateButtonVisibility();
+        setPage(0);
     }
 
     /**
@@ -112,8 +115,7 @@ public abstract class BookScreenMixin {
      */
     @Unique
     private void bookTweaks$jumpToStart() {
-        currentPage = 0;
-        updateButtonVisibility();
+        setPage(0);
     }
 
     /**
@@ -121,8 +123,7 @@ public abstract class BookScreenMixin {
      */
     @Unique
     private void bookTweaks$jumpToEnd() {
-        currentPage = Math.max(0, bookAccess.getPageCount() - 1);
-        updateButtonVisibility();
+        setPage(bookAccess.getPageCount() - 1);
     }
 
     /**

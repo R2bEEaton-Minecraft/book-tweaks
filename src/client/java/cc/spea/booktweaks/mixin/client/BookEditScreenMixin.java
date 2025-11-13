@@ -32,6 +32,9 @@ public abstract class BookEditScreenMixin {
     protected abstract void updateButtonVisibility();
 
     @Shadow
+    protected abstract void updatePageContent();
+
+    @Shadow
     protected abstract int getNumPages();
 
     @Unique
@@ -45,17 +48,19 @@ public abstract class BookEditScreenMixin {
         BookEditScreen screen = (BookEditScreen) (Object) this;
         ScreenAccessor accessor = (ScreenAccessor) this;
 
-        // Add "Jump to Start" button (left side)
+        int centerX = (screen.width - 192) / 2;
+
+        // Add "Jump to Start" button (to the left of the back button)
         accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal("<<"), button -> bookTweaks$jumpToStart())
-                        .bounds(screen.width / 2 - 100 - 50, 196, 20, 20)
+                        .bounds(centerX + 18, 159, 20, 20)
                         .build()
         );
 
-        // Add "Jump to End" button (right side)
+        // Add "Jump to End" button (to the right of the forward button)
         accessor.invokeAddRenderableWidget(
                 Button.builder(Component.literal(">>"), button -> bookTweaks$jumpToEnd())
-                        .bounds(screen.width / 2 + 100 + 30, 196, 20, 20)
+                        .bounds(centerX + 141, 159, 20, 20)
                         .build()
         );
 
@@ -82,6 +87,7 @@ public abstract class BookEditScreenMixin {
             currentPage = Math.max(0, getNumPages() - 1);
         }
 
+        updatePageContent();
         updateButtonVisibility();
     }
 
@@ -91,6 +97,7 @@ public abstract class BookEditScreenMixin {
     @Unique
     private void bookTweaks$jumpToStart() {
         currentPage = 0;
+        updatePageContent();
         updateButtonVisibility();
     }
 
@@ -100,6 +107,7 @@ public abstract class BookEditScreenMixin {
     @Unique
     private void bookTweaks$jumpToEnd() {
         currentPage = Math.max(0, getNumPages() - 1);
+        updatePageContent();
         updateButtonVisibility();
     }
 
