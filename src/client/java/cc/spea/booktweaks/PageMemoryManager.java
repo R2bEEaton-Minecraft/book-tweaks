@@ -1,18 +1,54 @@
 package cc.spea.booktweaks;
 
+import cc.spea.booktweaks.config.BookTweaksConfig;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.WritableBookContent;
 import net.minecraft.world.item.component.WrittenBookContent;
 
-import java.util.HashMap;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * Manages memory of which page each book was on when last closed.
+ * Uses LRU cache with persistent storage.
  */
 public class PageMemoryManager {
-    private static final Map<String, Integer> bookPages = new HashMap<>();
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Path CONFIG_DIR = FabricLoader.getInstance().getConfigDir().resolve("book-tweaks");
+    private static final Path DATA_PATH = CONFIG_DIR.resolve("page-memory.json");
+    private static BookTweaksConfig config;
+    private static Map<String, Integer> bookPages;
+
+    /**
+     * Initialize the page memory manager.
+     * Loads config and restores saved data.
+     */
+    public static void init() {
+        config = BookTweaksConfig.load();
+        bookPages = createLRUMap(config.maxBookMemoryEntries);
+        load();
+    }
+
+    /**
+     * Create an LRU (Least Recently Used) map with the given maximum size.
+     */
+    private static Map<String, Integer> createLRUMap(int maxSize) {
+        return new LinkedHashMap<String, Integer>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, Integer> eldest) {
+                return size() > maxSize;
+            }
+        };
+    }
 
     /**
      * Get a unique identifier for a book ItemStack.
@@ -49,9 +85,15 @@ public class PageMemoryManager {
      * Remember which page a book was on.
      */
     public static void rememberPage(ItemStack book, int page) {
+        if (bookPages == null) {
+            init();
+        }
+
         String bookId = getBookId(book);
         if (bookId != null) {
             bookPages.put(bookId, page);
+            // Auto-save after each update for better persistence
+            save();
         }
     }
 
@@ -59,6 +101,10 @@ public class PageMemoryManager {
      * Get the remembered page for a book, or null if not remembered.
      */
     public static Integer getRememberedPage(ItemStack book) {
+        if (bookPages == null) {
+            init();
+        }
+
         String bookId = getBookId(book);
         if (bookId != null) {
             return bookPages.get(bookId);
@@ -70,9 +116,14 @@ public class PageMemoryManager {
      * Clear memory for a specific book.
      */
     public static void forget(ItemStack book) {
+        if (bookPages == null) {
+            return;
+        }
+
         String bookId = getBookId(book);
         if (bookId != null) {
             bookPages.remove(bookId);
+            save();
         }
     }
 
@@ -80,6 +131,51 @@ public class PageMemoryManager {
      * Clear all remembered pages.
      */
     public static void clearAll() {
-        bookPages.clear();
+        if (bookPages != null) {
+            bookPages.clear();
+            save();
+        }
+    }
+
+    /**
+     * Save the page memory to disk.
+     */
+    public static void save() {
+        if (bookPages == null) {
+            return;
+        }
+
+        try {
+            // Ensure directory exists
+            Files.createDirectories(CONFIG_DIR);
+            String json = GSON.toJson(bookPages);
+            Files.writeString(DATA_PATH, json);
+        } catch (IOException e) {
+            System.err.println("Failed to save book page memory: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Load the page memory from disk.
+     */
+    private static void load() {
+        if (!Files.exists(DATA_PATH)) {
+            return;
+        }
+
+        try {
+            String json = Files.readString(DATA_PATH);
+            Type type = new TypeToken<LinkedHashMap<String, Integer>>(){}.getType();
+            Map<String, Integer> loaded = GSON.fromJson(json, type);
+
+            if (loaded != null) {
+                // Load entries into our LRU map, respecting the current size limit
+                for (Map.Entry<String, Integer> entry : loaded.entrySet()) {
+                    bookPages.put(entry.getKey(), entry.getValue());
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to load book page memory: " + e.getMessage());
+        }
     }
 }
