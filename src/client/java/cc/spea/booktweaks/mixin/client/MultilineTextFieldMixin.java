@@ -48,4 +48,43 @@ public abstract class MultilineTextFieldMixin implements MultilineTextFieldAcces
     public int bookTweaks$getSelectCursor() {
         return selectCursor;
     }
+
+    @Override
+    public int bookTweaks$getPreviousWordBeginIndex() {
+        // Replicate getPreviousWord() logic to get beginIndex
+        if (value.isEmpty()) {
+            return 0;
+        }
+
+        int i = Math.max(0, Math.min(cursor, value.length() - 1));
+
+        // Skip trailing whitespace
+        while (i > 0 && Character.isWhitespace(value.charAt(i - 1))) {
+            i--;
+        }
+
+        // Find start of word
+        while (i > 0 && !Character.isWhitespace(value.charAt(i - 1))) {
+            i--;
+        }
+
+        return i;
+    }
+
+    @Override
+    public int bookTweaks$getPreviousWordEndIndex() {
+        // Replicate getPreviousWord() logic to get endIndex
+        if (value.isEmpty()) {
+            return 0;
+        }
+
+        int i = bookTweaks$getPreviousWordBeginIndex();
+
+        // Find end of word (getWordEndPosition logic)
+        while (i < value.length() && !Character.isWhitespace(value.charAt(i))) {
+            i++;
+        }
+
+        return i;
+    }
 }

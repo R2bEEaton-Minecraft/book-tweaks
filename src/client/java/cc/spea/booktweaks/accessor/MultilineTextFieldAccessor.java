@@ -15,4 +15,7 @@ public interface MultilineTextFieldAccessor {
     int bookTweaks$getSelectCursor();
     void bookTweaks$seekCursor(Whence whence, int i);
     int bookTweaks$getLineAtCursor();
+
+    int bookTweaks$getPreviousWordBeginIndex();
+    int bookTweaks$getPreviousWordEndIndex();
 }

@@ -263,8 +263,8 @@ public abstract class BookEditScreenMixin {
                         if (insertWouldOverflow("a", mltfaccessor) && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
                             System.out.println("insertion overflowed, moving to next page");
                             if (this.currentPage == this.getNumPages() - 1 || this.pages.get(this.currentPage + 1).isEmpty()) {
-                                int beginIndex = ((MultilineTextField) mltfaccessor).getPreviousWord().beginIndex();
-                                int endIndex = ((MultilineTextField) mltfaccessor).getPreviousWord().endIndex();
+                                int beginIndex = mltfaccessor.bookTweaks$getPreviousWordBeginIndex();
+                                int endIndex = mltfaccessor.bookTweaks$getPreviousWordEndIndex();
                                 if (mltfaccessor.bookTweaks$getCursor() == endIndex) {
                                     // Cursor is at the end of a word, move entire word to next page
                                     String wordToMove = this.page.getValue().substring(beginIndex, endIndex);
