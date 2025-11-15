@@ -9,6 +9,7 @@ public interface MultilineTextFieldAccessor {
     boolean bookTweaks$overflowsLineLimit(String string);
     boolean bookTweaks$hasSelection();
     String bookTweaks$truncateInsertionText(String string);
+    void bookTweaks$insertText(String string);
 
     String bookTweaks$getValue();
     int bookTweaks$getCursor();

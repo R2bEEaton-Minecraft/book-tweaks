@@ -28,6 +28,9 @@ public abstract class MultilineTextFieldMixin implements MultilineTextFieldAcces
     @Invoker("truncateInsertionText")
     public abstract String bookTweaks$truncateInsertionText(String string);
 
+    @Invoker("insertText")
+    public abstract void bookTweaks$insertText(String string);
+
     @Invoker("seekCursor")
     public abstract void bookTweaks$seekCursor(Whence whence, int i);
 

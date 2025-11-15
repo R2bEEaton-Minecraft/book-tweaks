@@ -180,20 +180,52 @@ public abstract class BookEditScreenMixin {
             if (keyEvent.isPaste()) {
                 String clipboardContent = Minecraft.getInstance().keyboardHandler.getClipboard();
                 String remaining = clipboardContent;
-                
+
                 while (!remaining.isEmpty()) {
-                    if (!insertWouldOverflow(remaining, mltfaccessor)) {
-                        System.out.println("Pasting: " + remaining);
-                        return;
+                    // Try to paste as much as possible on current page
+                    String toPaste = remaining;
+
+                    // If it would overflow, trim to last word boundary
+                    while (insertWouldOverflow(toPaste, mltfaccessor) && toPaste.length() > 0) {
+                        int lastSpace = toPaste.lastIndexOf(' ');
+                        if (lastSpace <= 0) {
+                            // No space found, can't fit anything more
+                            break;
+                        }
+                        toPaste = toPaste.substring(0, lastSpace);
                     }
-                    int lastSpace = remaining.lastIndexOf(' ');
-                    if (lastSpace <= 0) {
-                        break;
+
+                    if (toPaste.isEmpty()) {
+                        // Nothing fits on this page, move to next
+                        if (this.currentPage < this.getNumPages() - 1) {
+                            this.pageForward();
+                            mleb = (MultiLineEditBoxAccessor) this.page;
+                            mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
+                            continue;
+                        } else {
+                            // Last page and nothing fits, we're done
+                            break;
+                        }
                     }
-                    remaining = remaining.substring(0, lastSpace);
+
+                    // Actually insert the text on current page
+                    mltfaccessor.bookTweaks$insertText(toPaste);
+                    remaining = remaining.substring(toPaste.length()).trim();
+
+                    // If there's more to paste, move to next page
+                    if (!remaining.isEmpty()) {
+                        if (this.currentPage < this.getNumPages() - 1) {
+                            this.pageForward();
+                        } else {
+                            // Create new page by moving forward (which adds a page if needed)
+                            this.pageForward();
+                        }
+                        mleb = (MultiLineEditBoxAccessor) this.page;
+                        mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
+                    }
                 }
-                
-                System.out.println("Nothing could fit on current page");
+
+                ci.setReturnValue(true);
                 return;
             } else {
                 switch (keyEvent.key()) {
