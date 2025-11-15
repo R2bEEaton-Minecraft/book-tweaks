@@ -170,8 +170,10 @@ public abstract class BookEditScreenMixin {
     private void onSave(CallbackInfo ci) {
         PageMemoryManager.rememberPage(book, currentPage);
     }
-
-    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = false)
+    /**
+     * Handle key presses to manage page overflow on insertions.
+     */
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
     private void onKeyPressed(KeyEvent keyEvent, CallbackInfoReturnable<Boolean> ci) {
         MultiLineEditBoxAccessor mleb = (MultiLineEditBoxAccessor) this.page;
         MultilineTextFieldAccessor mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
@@ -197,32 +199,83 @@ public abstract class BookEditScreenMixin {
                 switch (keyEvent.key()) {
                     case 257:
                     case 335:
-                        if (insertWouldOverflow("\n", mltfaccessor)) {
+                        if (insertWouldOverflow("\n", mltfaccessor) && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
                             System.out.println("newline overflowed, moving to next page");
                             this.pageForward();
                         }
                         return;
                     case 262:
+                        System.out.println("right arrow pressed");
+                        System.out.println("cursor at: " + mltfaccessor.bookTweaks$getCursor());
+                        System.out.println("page length: " + this.page.getValue().length());
+                        if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
+                            this.pageForward();
+                            mltfaccessor.bookTweaks$seekCursor(Whence.ABSOLUTE, 0);
+                        }
+					    return;
                     case 263:
+                        if (mltfaccessor.bookTweaks$getCursor() == 0 && this.currentPage > 0) {
+                            this.pageBack();
+                            mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
+                            ci.setReturnValue(true);
+                        }
+					    return;
                     case 264:
+                        if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1) {
+                            this.pageForward();
+                            mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
+                            ci.setReturnValue(true);
+                        }
+                        return;
                     case 265:
+                        if (mltfaccessor.bookTweaks$getLineAtCursor() == 0 && this.currentPage > 0) {
+                            this.pageBack();
+                            mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
+                            ci.setReturnValue(true);
+                        }
+					    return;
                     case 266:
                     case 267:
                     case 268:
                     case 269:
-                        System.out.println("seek attempted");
+                        System.out.println("seek attempted " + keyEvent.key());
                         return;
                     case 259:
                         System.out.println("deletion attempted");
-                        if (this.page.getValue() == "" && this.currentPage > 0) {
+                        System.out.println(this.page.getValue());
+                        if (this.page.getValue().isEmpty()) {
                             this.pageBack();
+                            this.page.setValue(this.page.getValue() + " ");
                         }
                         return;
                     default:
-                        System.out.println("default case " + keyEvent.key());
-                        if (insertWouldOverflow(Integer.toString(keyEvent.key()), mltfaccessor)) {
+                        // Only handle actual character input, not control keys
+                        // Control keys: Shift (340-341), Ctrl (342-343), Alt (344-345), Super (347-348), etc.
+                        int key = keyEvent.key();
+                        if (key >= 340 && key <= 348) {
+                            // Ignore modifier keys
+                            return;
+                        }
+
+                        System.out.println("default case " + key);
+                        // Check if inserting a character would overflow
+                        // We use a single character placeholder to test overflow
+                        if (insertWouldOverflow("a", mltfaccessor) && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
                             System.out.println("insertion overflowed, moving to next page");
-                            this.pageForward();
+                            if (this.currentPage == this.getNumPages() - 1 || this.pages.get(this.currentPage + 1).isEmpty()) {
+                                int beginIndex = ((MultilineTextField) mltfaccessor).getPreviousWord().beginIndex();
+                                int endIndex = ((MultilineTextField) mltfaccessor).getPreviousWord().endIndex();
+                                if (mltfaccessor.bookTweaks$getCursor() == endIndex) {
+                                    // Cursor is at the end of a word, move entire word to next page
+                                    String wordToMove = this.page.getValue().substring(beginIndex, endIndex);
+                                    this.page.setValue(this.page.getValue().substring(0, beginIndex));
+                                    this.pageForward();
+                                    this.page.setValue(wordToMove + this.page.getValue());
+                                } else {
+                                    // Just move to next page
+                                    this.pageForward();
+                                }
+                            }
                         }
                         return;
                 }

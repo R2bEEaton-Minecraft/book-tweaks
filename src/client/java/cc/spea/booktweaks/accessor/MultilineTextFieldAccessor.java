@@ -1,5 +1,7 @@
 package cc.spea.booktweaks.accessor;
 
+import net.minecraft.client.gui.components.Whence;
+
 /**
  * Duck interface to access protected MultilineTextField methods and fields
  */
@@ -11,4 +13,6 @@ public interface MultilineTextFieldAccessor {
     String bookTweaks$getValue();
     int bookTweaks$getCursor();
     int bookTweaks$getSelectCursor();
+    void bookTweaks$seekCursor(Whence whence, int i);
+    int bookTweaks$getLineAtCursor();
 }

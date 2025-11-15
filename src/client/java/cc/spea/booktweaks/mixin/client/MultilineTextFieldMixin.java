@@ -6,6 +6,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
 import net.minecraft.client.gui.components.MultilineTextField;
+import net.minecraft.client.gui.components.Whence;
 
 @Mixin(MultilineTextField.class)
 public abstract class MultilineTextFieldMixin implements MultilineTextFieldAccessor {
@@ -26,6 +27,12 @@ public abstract class MultilineTextFieldMixin implements MultilineTextFieldAcces
 
     @Invoker("truncateInsertionText")
     public abstract String bookTweaks$truncateInsertionText(String string);
+
+    @Invoker("seekCursor")
+    public abstract void bookTweaks$seekCursor(Whence whence, int i);
+
+    @Invoker("getLineAtCursor")
+    public abstract int bookTweaks$getLineAtCursor();
 
     @Override
     public String bookTweaks$getValue() {
