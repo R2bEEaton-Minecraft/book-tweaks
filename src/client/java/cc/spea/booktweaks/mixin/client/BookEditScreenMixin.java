@@ -243,6 +243,7 @@ public abstract class BookEditScreenMixin {
                         if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
                             this.pageForward();
                             mltfaccessor.bookTweaks$seekCursor(Whence.ABSOLUTE, 0);
+                            ci.setReturnValue(true);
                         }
 					    return;
                     case 263:
