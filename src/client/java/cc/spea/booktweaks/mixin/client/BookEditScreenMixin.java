@@ -245,7 +245,7 @@ public abstract class BookEditScreenMixin {
                         System.out.println(this.page.getValue());
                         if (this.page.getValue().isEmpty()) {
                             this.pageBack();
-                            this.page.setValue(this.page.getValue() + " ");
+                            ci.setReturnValue(true);
                         }
                         return;
                     default:
@@ -265,14 +265,16 @@ public abstract class BookEditScreenMixin {
                             if (this.currentPage == this.getNumPages() - 1 || this.pages.get(this.currentPage + 1).isEmpty()) {
                                 int beginIndex = mltfaccessor.bookTweaks$getPreviousWordBeginIndex();
                                 int endIndex = mltfaccessor.bookTweaks$getPreviousWordEndIndex();
-                                if (mltfaccessor.bookTweaks$getCursor() == endIndex) {
-                                    // Cursor is at the end of a word, move entire word to next page
+                                int wordLength = endIndex - beginIndex;
+
+                                if (mltfaccessor.bookTweaks$getCursor() == endIndex && wordLength <= 16) {
+                                    // Cursor is at the end of a word and word is 16 chars or less, move entire word to next page
                                     String wordToMove = this.page.getValue().substring(beginIndex, endIndex);
                                     this.page.setValue(this.page.getValue().substring(0, beginIndex));
                                     this.pageForward();
                                     this.page.setValue(wordToMove + this.page.getValue());
                                 } else {
-                                    // Just move to next page
+                                    // Word too long or cursor not at end, just move to next page
                                     this.pageForward();
                                 }
                             }
