@@ -2,8 +2,14 @@ package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.PageMemoryManager;
 import cc.spea.booktweaks.client.DoublePageButton;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.MultiLineEditBox;
+import net.minecraft.client.gui.components.MultilineTextField;
+import net.minecraft.client.gui.components.Whence;
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
 import net.minecraft.client.gui.screens.inventory.PageButton;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.util.StringUtil;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,6 +18,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
 
@@ -29,6 +36,9 @@ public abstract class BookEditScreenMixin {
     private List<String> pages;
 
     @Shadow
+    private MultiLineEditBox page;
+
+    @Shadow
     private PageButton forwardButton;
 
     @Shadow
@@ -42,6 +52,12 @@ public abstract class BookEditScreenMixin {
 
     @Shadow
     protected abstract int getNumPages();
+
+    @Shadow
+    protected abstract void pageForward();
+
+    @Shadow
+    protected abstract void pageBack();
 
     @Unique
     private boolean bookTweaks$initialPageSet = false;
@@ -151,5 +167,94 @@ public abstract class BookEditScreenMixin {
     @Inject(method = "saveChanges", at = @At("TAIL"))
     private void onSave(CallbackInfo ci) {
         PageMemoryManager.rememberPage(book, currentPage);
+    }
+
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = false)
+    private void onKeyPressed(KeyEvent keyEvent, CallbackInfoReturnable<Boolean> ci) {
+        MultiLineEditBoxMixin mleb = (MultiLineEditBoxMixin) (Object) this.page;
+        MultilineTextFieldMixin mltfaccessor = (MultilineTextFieldMixin) (Object) mleb.bookTweaks$getTextField();
+        if (mltfaccessor.bookTweaks$overflowsLineLimit(this.page.getValue() + "_")) {
+            if (keyEvent.isPaste()) {
+                System.out.println(insertWouldOverflow(Minecraft.getInstance().keyboardHandler.getClipboard(), mltfaccessor));
+                return;
+            } else if (keyEvent.isCut()) {
+                System.out.println(insertWouldOverflow("", mltfaccessor));
+                return;
+            } else {
+                switch (keyEvent.key()) {
+                    case 257:
+                    case 335:
+                        System.out.println(insertWouldOverflow("\n", mltfaccessor));
+                        return;
+                    // case 262:
+                    //     if (keyEvent.hasControlDown()) {
+                    //         MultilineTextField.StringView stringView = this.getNextWord();
+                    //         this.seekCursor(Whence.ABSOLUTE, stringView.beginIndex);
+                    //     } else {
+                    //         this.seekCursor(Whence.RELATIVE, 1);
+                    //     }
+
+                    //     return true;
+                    // case 263:
+                    //     if (keyEvent.hasControlDown()) {
+                    //         MultilineTextField.StringView stringView = this.getPreviousWord();
+                    //         this.seekCursor(Whence.ABSOLUTE, stringView.beginIndex);
+                    //     } else {
+                    //         this.seekCursor(Whence.RELATIVE, -1);
+                    //     }
+
+                    //     return true;
+                    // case 264:
+                    //     if (!keyEvent.hasControlDown()) {
+                    //         this.seekCursorLine(1);
+                    //     }
+
+                    //     return true;
+                    // case 265:
+                    //     if (!keyEvent.hasControlDown()) {
+                    //         this.seekCursorLine(-1);
+                    //     }
+
+                    //     return true;
+                    // case 266:
+                    //     this.seekCursor(Whence.ABSOLUTE, 0);
+                    //     return true;
+                    // case 267:
+                    //     this.seekCursor(Whence.END, 0);
+                    //     return true;
+                    // case 268:
+                    //     if (keyEvent.hasControlDown()) {
+                    //         this.seekCursor(Whence.ABSOLUTE, 0);
+                    //     } else {
+                    //         this.seekCursor(Whence.ABSOLUTE, this.getCursorLineView().beginIndex);
+                    //     }
+
+                    //     return true;
+                    // case 269:
+                    //     if (keyEvent.hasControlDown()) {
+                    //         this.seekCursor(Whence.END, 0);
+                    //     } else {
+                    //         this.seekCursor(Whence.ABSOLUTE, this.getCursorLineView().endIndex);
+                    //     }
+
+                    //     return true;
+                    default:
+                        System.out.println("default case");
+                        return;
+                }
+            }
+        }
+    }
+
+    @Unique
+    private boolean insertWouldOverflow(String string, MultilineTextFieldMixin mltfaccessor) {
+        if (!string.isEmpty() || mltfaccessor.bookTweaks$hasSelection()) {
+			String string2 = mltfaccessor.bookTweaks$truncateInsertionText(StringUtil.filterText(string, true));
+            int beginIndex = Math.min(mltfaccessor.selectCursor, mltfaccessor.cursor);
+            int endIndex = Math.max(mltfaccessor.selectCursor, mltfaccessor.cursor);
+			String string3 = new StringBuilder(mltfaccessor.value).replace(beginIndex, endIndex, string2).toString();
+			return mltfaccessor.bookTweaks$overflowsLineLimit(string3);
+		}
+        return false;
     }
 }
