@@ -1,6 +1,8 @@
 package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.PageMemoryManager;
+import cc.spea.booktweaks.accessor.MultiLineEditBoxAccessor;
+import cc.spea.booktweaks.accessor.MultilineTextFieldAccessor;
 import cc.spea.booktweaks.client.DoublePageButton;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.MultiLineEditBox;
@@ -171,88 +173,69 @@ public abstract class BookEditScreenMixin {
 
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = false)
     private void onKeyPressed(KeyEvent keyEvent, CallbackInfoReturnable<Boolean> ci) {
-        MultiLineEditBoxMixin mleb = (MultiLineEditBoxMixin) (Object) this.page;
-        MultilineTextFieldMixin mltfaccessor = (MultilineTextFieldMixin) (Object) mleb.bookTweaks$getTextField();
-        if (mltfaccessor.bookTweaks$overflowsLineLimit(this.page.getValue() + "_")) {
+        MultiLineEditBoxAccessor mleb = (MultiLineEditBoxAccessor) this.page;
+        MultilineTextFieldAccessor mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
             if (keyEvent.isPaste()) {
-                System.out.println(insertWouldOverflow(Minecraft.getInstance().keyboardHandler.getClipboard(), mltfaccessor));
-                return;
-            } else if (keyEvent.isCut()) {
-                System.out.println(insertWouldOverflow("", mltfaccessor));
+                String clipboardContent = Minecraft.getInstance().keyboardHandler.getClipboard();
+                String remaining = clipboardContent;
+                
+                while (!remaining.isEmpty()) {
+                    if (!insertWouldOverflow(remaining, mltfaccessor)) {
+                        System.out.println("Pasting: " + remaining);
+                        return;
+                    }
+                    int lastSpace = remaining.lastIndexOf(' ');
+                    if (lastSpace <= 0) {
+                        break;
+                    }
+                    remaining = remaining.substring(0, lastSpace);
+                }
+                
+                System.out.println("Nothing could fit on current page");
                 return;
             } else {
                 switch (keyEvent.key()) {
                     case 257:
                     case 335:
-                        System.out.println(insertWouldOverflow("\n", mltfaccessor));
+                        if (insertWouldOverflow("\n", mltfaccessor)) {
+                            System.out.println("newline overflowed, moving to next page");
+                            this.pageForward();
+                        }
                         return;
-                    // case 262:
-                    //     if (keyEvent.hasControlDown()) {
-                    //         MultilineTextField.StringView stringView = this.getNextWord();
-                    //         this.seekCursor(Whence.ABSOLUTE, stringView.beginIndex);
-                    //     } else {
-                    //         this.seekCursor(Whence.RELATIVE, 1);
-                    //     }
-
-                    //     return true;
-                    // case 263:
-                    //     if (keyEvent.hasControlDown()) {
-                    //         MultilineTextField.StringView stringView = this.getPreviousWord();
-                    //         this.seekCursor(Whence.ABSOLUTE, stringView.beginIndex);
-                    //     } else {
-                    //         this.seekCursor(Whence.RELATIVE, -1);
-                    //     }
-
-                    //     return true;
-                    // case 264:
-                    //     if (!keyEvent.hasControlDown()) {
-                    //         this.seekCursorLine(1);
-                    //     }
-
-                    //     return true;
-                    // case 265:
-                    //     if (!keyEvent.hasControlDown()) {
-                    //         this.seekCursorLine(-1);
-                    //     }
-
-                    //     return true;
-                    // case 266:
-                    //     this.seekCursor(Whence.ABSOLUTE, 0);
-                    //     return true;
-                    // case 267:
-                    //     this.seekCursor(Whence.END, 0);
-                    //     return true;
-                    // case 268:
-                    //     if (keyEvent.hasControlDown()) {
-                    //         this.seekCursor(Whence.ABSOLUTE, 0);
-                    //     } else {
-                    //         this.seekCursor(Whence.ABSOLUTE, this.getCursorLineView().beginIndex);
-                    //     }
-
-                    //     return true;
-                    // case 269:
-                    //     if (keyEvent.hasControlDown()) {
-                    //         this.seekCursor(Whence.END, 0);
-                    //     } else {
-                    //         this.seekCursor(Whence.ABSOLUTE, this.getCursorLineView().endIndex);
-                    //     }
-
-                    //     return true;
+                    case 262:
+                    case 263:
+                    case 264:
+                    case 265:
+                    case 266:
+                    case 267:
+                    case 268:
+                    case 269:
+                        System.out.println("seek attempted");
+                        return;
+                    case 259:
+                        System.out.println("deletion attempted");
+                        if (this.page.getValue() == "" && this.currentPage > 0) {
+                            this.pageBack();
+                        }
+                        return;
                     default:
-                        System.out.println("default case");
+                        System.out.println("default case " + keyEvent.key());
+                        if (insertWouldOverflow(Integer.toString(keyEvent.key()), mltfaccessor)) {
+                            System.out.println("insertion overflowed, moving to next page");
+                            this.pageForward();
+                        }
                         return;
                 }
             }
-        }
     }
 
     @Unique
-    private boolean insertWouldOverflow(String string, MultilineTextFieldMixin mltfaccessor) {
+    private boolean insertWouldOverflow(String string, MultilineTextFieldAccessor mltfaccessor) {
         if (!string.isEmpty() || mltfaccessor.bookTweaks$hasSelection()) {
 			String string2 = mltfaccessor.bookTweaks$truncateInsertionText(StringUtil.filterText(string, true));
-            int beginIndex = Math.min(mltfaccessor.selectCursor, mltfaccessor.cursor);
-            int endIndex = Math.max(mltfaccessor.selectCursor, mltfaccessor.cursor);
-			String string3 = new StringBuilder(mltfaccessor.value).replace(beginIndex, endIndex, string2).toString();
+            int beginIndex = Math.min(mltfaccessor.bookTweaks$getSelectCursor(), mltfaccessor.bookTweaks$getCursor());
+            int endIndex = Math.max(mltfaccessor.bookTweaks$getSelectCursor(), mltfaccessor.bookTweaks$getCursor());
+			String string3 = new StringBuilder(mltfaccessor.bookTweaks$getValue()).replace(beginIndex, endIndex, string2).toString();
 			return mltfaccessor.bookTweaks$overflowsLineLimit(string3);
 		}
         return false;
