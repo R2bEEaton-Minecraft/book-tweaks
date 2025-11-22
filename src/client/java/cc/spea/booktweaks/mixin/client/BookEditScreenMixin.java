@@ -61,6 +61,9 @@ public abstract class BookEditScreenMixin {
     @Shadow
     protected abstract void pageBack();
 
+    @Shadow
+    protected abstract void saveChanges();
+
     @Unique
     private boolean bookTweaks$initialPageSet = false;
 
@@ -229,6 +232,11 @@ public abstract class BookEditScreenMixin {
                 return;
             } else {
                 switch (keyEvent.key()) {
+                    case 256:
+                        // ESC key - save current page before closing
+                        this.saveChanges();
+                        PageMemoryManager.rememberPage(book, currentPage);
+                        return;
                     case 257:
                     case 335:
                         if (insertWouldOverflow("\n", mltfaccessor) && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
