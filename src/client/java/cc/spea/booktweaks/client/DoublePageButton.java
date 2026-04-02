@@ -1,6 +1,10 @@
 package cc.spea.booktweaks.client;
 
+#if MC_VER >= MC_26_1
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+#else
 import net.minecraft.client.gui.GuiGraphics;
+#endif
 import net.minecraft.client.gui.screens.inventory.PageButton;
 #if MC_VER >= MC_1_21_6
 import net.minecraft.client.renderer.RenderPipelines;
@@ -36,7 +40,11 @@ public class DoublePageButton extends PageButton {
         this.isForward = isForward;
     }
 
-#if MC_VER >= MC_1_21_11
+#if MC_VER >= MC_26_1
+    @Override
+    public void extractContents(GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float partialTick) {
+        Identifier sprite;
+#elif MC_VER >= MC_1_21_11
     @Override
     public void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         Identifier sprite;
@@ -54,7 +62,10 @@ public class DoublePageButton extends PageButton {
 
         // Render the arrow twice to create a double arrow effect
         int offset = this.isForward ? 6 : -6;
-#if MC_VER >= MC_1_21_6
+#if MC_VER >= MC_26_1
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, this.getX() + offset, this.getY(), 23, 13);
+        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, this.getX(), this.getY(), 23, 13);
+#elif MC_VER >= MC_1_21_6
         guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, this.getX() + offset, this.getY(), 23, 13);
         guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, this.getX(), this.getY(), 23, 13);
 #elif MC_VER >= MC_1_21_2
