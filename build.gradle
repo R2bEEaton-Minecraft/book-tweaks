@@ -24,7 +24,7 @@ version = "${project.mod_version}-${gradle.ext.minecraft_version}"
 group = project.maven_group
 
 base {
-	archivesName = "${project.archives_base_name}-${gradle.ext.minecraft_version}"
+	archivesName = project.archives_base_name
 }
 
 repositories {

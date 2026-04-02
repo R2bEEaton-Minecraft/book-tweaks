@@ -2,6 +2,7 @@
 
 .gradle/
 build/
+release-all/
 out/
 classes/
 build.properties

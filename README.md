@@ -60,7 +60,7 @@ Built jars are written to `build/libs/`.
 
 Upload the normal jar to Modrinth, for example:
 
-- `book-tweaks-1.21.11-1.2.0-1.21.11.jar`
-- `book-tweaks-26.1.1-1.2.0-26.1.1.jar`
+- `book-tweaks-1.2.0-1.21.11.jar`
+- `book-tweaks-1.2.0-26.1.1.jar`
 
 Do not upload the `-sources.jar` files.
