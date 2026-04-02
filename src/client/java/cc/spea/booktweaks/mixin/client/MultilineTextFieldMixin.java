@@ -1,6 +1,7 @@
 package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.accessor.MultilineTextFieldAccessor;
+#if MC_VER >= MC_1_21_6
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -91,3 +92,63 @@ public abstract class MultilineTextFieldMixin implements MultilineTextFieldAcces
         return i;
     }
 }
+#else
+import net.minecraft.client.gui.components.Whence;
+
+public abstract class MultilineTextFieldMixin implements MultilineTextFieldAccessor {
+    @Override
+    public boolean bookTweaks$overflowsLineLimit(String string) {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public boolean bookTweaks$hasSelection() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public String bookTweaks$truncateInsertionText(String string) {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public void bookTweaks$insertText(String string) {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public String bookTweaks$getValue() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public int bookTweaks$getCursor() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public int bookTweaks$getSelectCursor() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public void bookTweaks$seekCursor(Whence whence, int i) {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public int bookTweaks$getLineAtCursor() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public int bookTweaks$getPreviousWordBeginIndex() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+
+    @Override
+    public int bookTweaks$getPreviousWordEndIndex() {
+        throw new UnsupportedOperationException("MultilineTextFieldMixin is only available on 1.21.6+");
+    }
+}
+#endif
