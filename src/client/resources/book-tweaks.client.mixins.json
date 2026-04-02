@@ -5,9 +5,7 @@
 	"client": [
 		"BookEditScreenMixin",
 		"BookScreenMixin",
-		"ScreenAccessor",
-		"MultiLineEditBoxMixin",
-		"MultilineTextFieldMixin"
+		"ScreenAccessor"${late_text_field_mixins}
 	],
 	"injectors": {
 		"defaultRequire": 1

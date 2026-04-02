@@ -3,7 +3,6 @@ package cc.spea.booktweaks.mixin.client;
 import cc.spea.booktweaks.PageMemoryManager;
 import cc.spea.booktweaks.client.DoublePageButton;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.BookViewScreen;
 import net.minecraft.client.gui.screens.inventory.PageButton;
 import net.minecraft.world.item.ItemStack;
@@ -14,6 +13,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(BookViewScreen.class)
 public abstract class BookScreenMixin {
@@ -162,7 +162,7 @@ public abstract class BookScreenMixin {
     /**
      * Remember the current page when navigating backward.
      */
-    @Inject(method = "pageBack", at = @At("HEAD"))
+    @Inject(method = "pageBack", at = @At("TAIL"))
     private void onPageBack(CallbackInfo ci) {
         if (bookTweaks$bookStack != null) {
             PageMemoryManager.rememberPage(bookTweaks$bookStack, currentPage);
@@ -172,7 +172,7 @@ public abstract class BookScreenMixin {
     /**
      * Remember the current page when navigating forward.
      */
-    @Inject(method = "pageForward", at = @At("HEAD"))
+    @Inject(method = "pageForward", at = @At("TAIL"))
     private void onPageForward(CallbackInfo ci) {
         if (bookTweaks$bookStack != null) {
             PageMemoryManager.rememberPage(bookTweaks$bookStack, currentPage);
@@ -180,11 +180,11 @@ public abstract class BookScreenMixin {
     }
 
     /**
-     * Remember the current page when rendering (saves periodically).
+     * Remember the current page whenever a direct page change succeeds.
      */
-    @Inject(method = "render", at = @At("HEAD"))
-    private void onRender(GuiGraphics guiGraphics, int i, int j, float f, CallbackInfo ci) {
-        if (bookTweaks$bookStack != null) {
+    @Inject(method = "setPage", at = @At("TAIL"))
+    private void onSetPage(int page, CallbackInfoReturnable<Boolean> cir) {
+        if (bookTweaks$bookStack != null && cir.getReturnValue()) {
             PageMemoryManager.rememberPage(bookTweaks$bookStack, currentPage);
         }
     }

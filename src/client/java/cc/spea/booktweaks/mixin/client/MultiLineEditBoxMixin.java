@@ -1,6 +1,7 @@
 package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.accessor.MultiLineEditBoxAccessor;
+#if MC_VER >= MC_1_21_6
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
@@ -17,3 +18,13 @@ public abstract class MultiLineEditBoxMixin implements MultiLineEditBoxAccessor 
         return this.textField;
     }
 }
+#else
+import net.minecraft.client.gui.components.MultilineTextField;
+
+public abstract class MultiLineEditBoxMixin implements MultiLineEditBoxAccessor {
+    @Override
+    public MultilineTextField bookTweaks$getTextField() {
+        throw new UnsupportedOperationException("MultiLineEditBoxMixin is only available on 1.21.6+");
+    }
+}
+#endif

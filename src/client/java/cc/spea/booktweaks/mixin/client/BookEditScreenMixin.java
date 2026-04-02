@@ -1,16 +1,27 @@
 package cc.spea.booktweaks.mixin.client;
 
 import cc.spea.booktweaks.PageMemoryManager;
+#if MC_VER >= MC_1_21_6
 import cc.spea.booktweaks.accessor.MultiLineEditBoxAccessor;
 import cc.spea.booktweaks.accessor.MultilineTextFieldAccessor;
+#endif
 import cc.spea.booktweaks.client.DoublePageButton;
 import net.minecraft.client.Minecraft;
+#if MC_VER >= MC_1_21_6
 import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.components.MultilineTextField;
 import net.minecraft.client.gui.components.Whence;
+#else
+import net.minecraft.client.gui.font.TextFieldHelper;
+#endif
+#if MC_VER < MC_1_21_9
+import net.minecraft.client.gui.screens.Screen;
+#endif
 import net.minecraft.client.gui.screens.inventory.BookEditScreen;
 import net.minecraft.client.gui.screens.inventory.PageButton;
+#if MC_VER >= MC_1_21_9
 import net.minecraft.client.input.KeyEvent;
+#endif
 import net.minecraft.util.StringUtil;
 import net.minecraft.world.item.ItemStack;
 import org.spongepowered.asm.mixin.Final;
@@ -22,6 +33,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.List;
 
 @Mixin(BookEditScreen.class)
@@ -37,8 +50,14 @@ public abstract class BookEditScreenMixin {
     @Final
     private List<String> pages;
 
+#if MC_VER >= MC_1_21_6
     @Shadow
     private MultiLineEditBox page;
+#else
+    @Shadow
+    @Final
+    private TextFieldHelper pageEdit;
+#endif
 
     @Shadow
     private PageButton forwardButton;
@@ -50,9 +69,6 @@ public abstract class BookEditScreenMixin {
     protected abstract void updateButtonVisibility();
 
     @Shadow
-    protected abstract void updatePageContent();
-
-    @Shadow
     protected abstract int getNumPages();
 
     @Shadow
@@ -61,8 +77,19 @@ public abstract class BookEditScreenMixin {
     @Shadow
     protected abstract void pageBack();
 
+#if MC_VER >= MC_1_21_6
     @Shadow
     protected abstract void saveChanges();
+#else
+    @Shadow
+    protected abstract String getCurrentPageText();
+
+    @Shadow
+    protected abstract void setCurrentPageText(String string);
+
+    @Shadow
+    protected abstract void saveChanges(boolean bl);
+#endif
 
     @Unique
     private boolean bookTweaks$initialPageSet = false;
@@ -72,6 +99,17 @@ public abstract class BookEditScreenMixin {
 
     @Unique
     private PageButton bookTweaks$jumpToEndButton;
+
+#if MC_VER < MC_1_21_6
+    @Unique
+    private static Field bookTweaks$legacyDisplayCacheField;
+
+    @Unique
+    private static Field bookTweaks$legacyLineStartsField;
+
+    @Unique
+    private static Field bookTweaks$legacyLinesField;
+#endif
 
     /**
      * Inject into init method to add our custom buttons and set initial page.
@@ -119,17 +157,7 @@ public abstract class BookEditScreenMixin {
     @Unique
     private void bookTweaks$setInitialPage() {
         Integer rememberedPage = PageMemoryManager.getRememberedPage(book);
-
-        if (rememberedPage != null) {
-            // Jump to remembered page
-            currentPage = Math.max(0, Math.min(rememberedPage, getNumPages() - 1));
-        } else {
-            // Default to first page for writeable books
-            currentPage = 0;
-        }
-
-        updatePageContent();
-        updateButtonVisibility();
+        bookTweaks$goToPage(rememberedPage != null ? rememberedPage : 0);
     }
 
     /**
@@ -137,9 +165,7 @@ public abstract class BookEditScreenMixin {
      */
     @Unique
     private void bookTweaks$jumpToStart() {
-        currentPage = 0;
-        updatePageContent();
-        updateButtonVisibility();
+        bookTweaks$goToPage(0);
     }
 
     /**
@@ -147,8 +173,20 @@ public abstract class BookEditScreenMixin {
      */
     @Unique
     private void bookTweaks$jumpToEnd() {
-        currentPage = Math.max(0, getNumPages() - 1);
-        updatePageContent();
+        bookTweaks$goToPage(getNumPages() - 1);
+    }
+
+    @Unique
+    private void bookTweaks$goToPage(int targetPage) {
+        int clampedTarget = Math.max(0, Math.min(targetPage, getNumPages() - 1));
+
+        while (currentPage < clampedTarget) {
+            pageForward();
+        }
+        while (currentPage > clampedTarget) {
+            pageBack();
+        }
+
         updateButtonVisibility();
     }
 
@@ -166,174 +204,430 @@ public abstract class BookEditScreenMixin {
     }
 
     /**
+     * Persist page memory immediately when page navigation succeeds, even if no text changed.
+     */
+    @Inject(method = "pageBack", at = @At("TAIL"))
+    private void onPageBackRemember(CallbackInfo ci) {
+        PageMemoryManager.rememberPage(book, currentPage);
+    }
+
+    /**
+     * Persist page memory immediately when page navigation succeeds, even if no text changed.
+     */
+    @Inject(method = "pageForward", at = @At("TAIL"))
+    private void onPageForwardRemember(CallbackInfo ci) {
+        PageMemoryManager.rememberPage(book, currentPage);
+    }
+
+    /**
      * Remember the current page when the book is closed/saved.
      * Inject at TAIL to ensure the ItemStack is updated with new content first.
      */
+#if MC_VER >= MC_1_21_6
     @Inject(method = "saveChanges", at = @At("TAIL"))
     private void onSave(CallbackInfo ci) {
         PageMemoryManager.rememberPage(book, currentPage);
     }
+#else
+    @Inject(method = "saveChanges", at = @At("TAIL"))
+    private void onSave(boolean bl, CallbackInfo ci) {
+        PageMemoryManager.rememberPage(book, currentPage);
+    }
+#endif
+
     /**
      * Handle key presses to manage page overflow on insertions.
      */
+#if MC_VER >= MC_1_21_9
     @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
     private void onKeyPressed(KeyEvent keyEvent, CallbackInfoReturnable<Boolean> ci) {
-        MultiLineEditBoxAccessor mleb = (MultiLineEditBoxAccessor) this.page;
-        MultilineTextFieldAccessor mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
-            if (keyEvent.isPaste()) {
-                String clipboardContent = Minecraft.getInstance().keyboardHandler.getClipboard();
-                String remaining = clipboardContent;
-
-                while (!remaining.isEmpty()) {
-                    // Try to paste as much as possible on current page
-                    String toPaste = remaining;
-
-                    // If it would overflow, trim to last word boundary
-                    while (insertWouldOverflow(toPaste, mltfaccessor) && toPaste.length() > 0) {
-                        int lastSpace = toPaste.lastIndexOf(' ');
-                        if (lastSpace <= 0) {
-                            // No space found, can't fit anything more
-                            break;
-                        }
-                        toPaste = toPaste.substring(0, lastSpace);
-                    }
-
-                    if (toPaste.isEmpty()) {
-                        // Nothing fits on this page, move to next
-                        if (this.currentPage < this.getNumPages() - 1) {
-                            this.pageForward();
-                            mleb = (MultiLineEditBoxAccessor) this.page;
-                            mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
-                            continue;
-                        } else {
-                            // Last page and nothing fits, we're done
-                            break;
-                        }
-                    }
-
-                    // Actually insert the text on current page
-                    mltfaccessor.bookTweaks$insertText(toPaste);
-                    remaining = remaining.substring(toPaste.length()).trim();
-
-                    // If there's more to paste, move to next page
-                    if (!remaining.isEmpty()) {
-                        if (this.currentPage < this.getNumPages() - 1) {
-                            this.pageForward();
-                        } else {
-                            // Create new page by moving forward (which adds a page if needed)
-                            this.pageForward();
-                        }
-                        mleb = (MultiLineEditBoxAccessor) this.page;
-                        mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
-                    }
-                }
-
-                ci.setReturnValue(true);
-                return;
-            } else {
-                switch (keyEvent.key()) {
-                    case 256:
-                        // ESC key - save current page before closing
-                        this.saveChanges();
-                        PageMemoryManager.rememberPage(book, currentPage);
-                        return;
-                    case 257:
-                    case 335:
-                        if (insertWouldOverflow("\n", mltfaccessor) && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
-                            System.out.println("newline overflowed, moving to next page");
-                            this.pageForward();
-                        }
-                        return;
-                    case 262:
-                        System.out.println("right arrow pressed");
-                        System.out.println("cursor at: " + mltfaccessor.bookTweaks$getCursor());
-                        System.out.println("page length: " + this.page.getValue().length());
-                        if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
-                            this.pageForward();
-                            mltfaccessor.bookTweaks$seekCursor(Whence.ABSOLUTE, 0);
-                            ci.setReturnValue(true);
-                        }
-					    return;
-                    case 263:
-                        if (mltfaccessor.bookTweaks$getCursor() == 0 && this.currentPage > 0) {
-                            this.pageBack();
-                            mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
-                            ci.setReturnValue(true);
-                        }
-					    return;
-                    case 264:
-                        if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1) {
-                            this.pageForward();
-                            mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
-                            ci.setReturnValue(true);
-                        }
-                        return;
-                    case 265:
-                        if (mltfaccessor.bookTweaks$getLineAtCursor() == 0 && this.currentPage > 0) {
-                            this.pageBack();
-                            mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
-                            ci.setReturnValue(true);
-                        }
-					    return;
-                    case 266:
-                    case 267:
-                    case 268:
-                    case 269:
-                        System.out.println("seek attempted " + keyEvent.key());
-                        return;
-                    case 259:
-                        System.out.println("deletion attempted");
-                        System.out.println(this.page.getValue());
-                        if (this.page.getValue().isEmpty()) {
-                            this.pageBack();
-                            ci.setReturnValue(true);
-                        }
-                        return;
-                    default:
-                        // Only handle actual character input, not control keys
-                        // Control keys: Shift (340-341), Ctrl (342-343), Alt (344-345), Super (347-348), etc.
-                        int key = keyEvent.key();
-                        if (key >= 340 && key <= 348) {
-                            // Ignore modifier keys
-                            return;
-                        }
-
-                        System.out.println("default case " + key);
-                        // Check if inserting a character would overflow
-                        // We use a single character placeholder to test overflow
-                        if (insertWouldOverflow("a", mltfaccessor) && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1 && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
-                            System.out.println("insertion overflowed, moving to next page");
-                            if (this.currentPage == this.getNumPages() - 1 || this.pages.get(this.currentPage + 1).isEmpty()) {
-                                int beginIndex = mltfaccessor.bookTweaks$getPreviousWordBeginIndex();
-                                int endIndex = mltfaccessor.bookTweaks$getPreviousWordEndIndex();
-                                int wordLength = endIndex - beginIndex;
-
-                                if (mltfaccessor.bookTweaks$getCursor() == endIndex && wordLength <= 16) {
-                                    // Cursor is at the end of a word and word is 16 chars or less, move entire word to next page
-                                    String wordToMove = this.page.getValue().substring(beginIndex, endIndex);
-                                    this.page.setValue(this.page.getValue().substring(0, beginIndex));
-                                    this.pageForward();
-                                    this.page.setValue(wordToMove + this.page.getValue());
-                                } else {
-                                    // Word too long or cursor not at end, just move to next page
-                                    this.pageForward();
-                                }
-                            }
-                        }
-                        return;
-                }
-            }
+        bookTweaks$handleKeyPressed(keyEvent.key(), keyEvent.isPaste(), ci);
     }
+#else
+    @Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
+    private void onKeyPressed(int keyCode, int scanCode, int modifiers, CallbackInfoReturnable<Boolean> ci) {
+        bookTweaks$handleKeyPressed(keyCode, Screen.isPaste(keyCode), ci);
+    }
+#endif
 
     @Unique
-    private boolean insertWouldOverflow(String string, MultilineTextFieldAccessor mltfaccessor) {
+    private void bookTweaks$handleKeyPressed(int keyCode, boolean isPaste, CallbackInfoReturnable<Boolean> ci) {
+#if MC_VER >= MC_1_21_6
+        MultiLineEditBoxAccessor mleb = (MultiLineEditBoxAccessor) this.page;
+        MultilineTextFieldAccessor mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
+        if (isPaste) {
+            String remaining = Minecraft.getInstance().keyboardHandler.getClipboard();
+
+            while (!remaining.isEmpty()) {
+                String toPaste = remaining;
+
+                while (insertWouldOverflow(toPaste, mltfaccessor) && !toPaste.isEmpty()) {
+                    int lastSpace = toPaste.lastIndexOf(' ');
+                    if (lastSpace <= 0) {
+                        break;
+                    }
+                    toPaste = toPaste.substring(0, lastSpace);
+                }
+
+                if (toPaste.isEmpty()) {
+                    if (currentPage < getNumPages() - 1) {
+                        pageForward();
+                        mleb = (MultiLineEditBoxAccessor) this.page;
+                        mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
+                        continue;
+                    }
+                    break;
+                }
+
+                mltfaccessor.bookTweaks$insertText(toPaste);
+                remaining = remaining.substring(toPaste.length()).trim();
+
+                if (!remaining.isEmpty()) {
+                    pageForward();
+                    mleb = (MultiLineEditBoxAccessor) this.page;
+                    mltfaccessor = (MultilineTextFieldAccessor) mleb.bookTweaks$getTextField();
+                }
+            }
+
+            ci.setReturnValue(true);
+            return;
+        }
+
+        switch (keyCode) {
+            case 256:
+                bookTweaks$saveChangesForCurrentVersion();
+                PageMemoryManager.rememberPage(book, currentPage);
+                return;
+            case 257:
+            case 335:
+                if (insertWouldOverflow("\n", mltfaccessor)
+                        && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1
+                        && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
+                    pageForward();
+                }
+                return;
+            case 262:
+                if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1
+                        && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
+                    pageForward();
+                    mltfaccessor.bookTweaks$seekCursor(Whence.ABSOLUTE, 0);
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 263:
+                if (mltfaccessor.bookTweaks$getCursor() == 0 && currentPage > 0) {
+                    pageBack();
+                    mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 264:
+                if (mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1) {
+                    pageForward();
+                    mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 265:
+                if (mltfaccessor.bookTweaks$getLineAtCursor() == 0 && currentPage > 0) {
+                    pageBack();
+                    mltfaccessor.bookTweaks$seekCursor(Whence.END, 0);
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 266:
+            case 267:
+            case 268:
+            case 269:
+                return;
+            case 259:
+                if (this.page.getValue().isEmpty()) {
+                    pageBack();
+                    ci.setReturnValue(true);
+                }
+                return;
+            default:
+                if (keyCode >= 340 && keyCode <= 348) {
+                    return;
+                }
+
+                if (insertWouldOverflow("a", mltfaccessor)
+                        && mltfaccessor.bookTweaks$getLineAtCursor() == 126 / 9 - 1
+                        && mltfaccessor.bookTweaks$getCursor() == this.page.getValue().length()) {
+                    if (currentPage == getNumPages() - 1 || pages.get(currentPage + 1).isEmpty()) {
+                        int beginIndex = mltfaccessor.bookTweaks$getPreviousWordBeginIndex();
+                        int endIndex = mltfaccessor.bookTweaks$getPreviousWordEndIndex();
+                        int wordLength = endIndex - beginIndex;
+
+                        if (mltfaccessor.bookTweaks$getCursor() == endIndex && wordLength <= 16) {
+                            String wordToMove = this.page.getValue().substring(beginIndex, endIndex);
+                            this.page.setValue(this.page.getValue().substring(0, beginIndex));
+                            pageForward();
+                            this.page.setValue(wordToMove + this.page.getValue());
+                        } else {
+                            pageForward();
+                        }
+                    }
+                }
+                return;
+        }
+#else
+        if (isPaste) {
+            String remaining = Minecraft.getInstance().keyboardHandler.getClipboard();
+
+            while (!remaining.isEmpty()) {
+                String toPaste = remaining;
+
+                while (bookTweaks$legacyInsertWouldOverflow(toPaste) && !toPaste.isEmpty()) {
+                    int lastSpace = toPaste.lastIndexOf(' ');
+                    if (lastSpace <= 0) {
+                        break;
+                    }
+                    toPaste = toPaste.substring(0, lastSpace);
+                }
+
+                if (toPaste.isEmpty()) {
+                    if (currentPage < getNumPages() - 1) {
+                        pageForward();
+                        pageEdit.setCursorToStart();
+                        continue;
+                    }
+                    break;
+                }
+
+                pageEdit.insertText(toPaste);
+                remaining = remaining.substring(toPaste.length()).trim();
+
+                if (!remaining.isEmpty()) {
+                    pageForward();
+                    pageEdit.setCursorToStart();
+                }
+            }
+
+            ci.setReturnValue(true);
+            return;
+        }
+
+        String currentText = getCurrentPageText();
+        int cursor = pageEdit.getCursorPos();
+        int lineAtCursor = bookTweaks$getLegacyLineAtCursor();
+        int lastLine = bookTweaks$getLegacyLineCount() - 1;
+
+        switch (keyCode) {
+            case 256:
+                bookTweaks$saveChangesForCurrentVersion();
+                PageMemoryManager.rememberPage(book, currentPage);
+                return;
+            case 257:
+            case 335:
+                if (bookTweaks$legacyInsertWouldOverflow("\n") && lineAtCursor == lastLine && cursor == currentText.length()) {
+                    pageForward();
+                    pageEdit.setCursorToStart();
+                }
+                return;
+            case 262:
+                if (lineAtCursor == lastLine && cursor == currentText.length()) {
+                    pageForward();
+                    pageEdit.setCursorToStart();
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 263:
+                if (cursor == 0 && currentPage > 0) {
+                    pageBack();
+                    pageEdit.setCursorToEnd();
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 264:
+                if (lineAtCursor == lastLine) {
+                    pageForward();
+                    pageEdit.setCursorToEnd();
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 265:
+                if (lineAtCursor == 0 && currentPage > 0) {
+                    pageBack();
+                    pageEdit.setCursorToEnd();
+                    ci.setReturnValue(true);
+                }
+                return;
+            case 266:
+            case 267:
+            case 268:
+            case 269:
+                return;
+            case 259:
+                if (currentText.isEmpty()) {
+                    pageBack();
+                    ci.setReturnValue(true);
+                }
+                return;
+            default:
+                if (keyCode >= 340 && keyCode <= 348) {
+                    return;
+                }
+
+                if (bookTweaks$legacyInsertWouldOverflow("a") && lineAtCursor == lastLine && cursor == currentText.length()) {
+                    if (currentPage == getNumPages() - 1 || pages.get(currentPage + 1).isEmpty()) {
+                        int beginIndex = bookTweaks$getLegacyPreviousWordBeginIndex(currentText, cursor);
+                        int endIndex = bookTweaks$getLegacyPreviousWordEndIndex(currentText, cursor);
+                        int wordLength = endIndex - beginIndex;
+
+                        if (cursor == endIndex && wordLength <= 16) {
+                            String wordToMove = currentText.substring(beginIndex, endIndex);
+                            setCurrentPageText(currentText.substring(0, beginIndex));
+                            pageForward();
+                            pageEdit.setCursorToStart();
+                            pageEdit.insertText(wordToMove);
+                        } else {
+                            pageForward();
+                            pageEdit.setCursorToStart();
+                        }
+                    }
+                }
+                return;
+        }
+#endif
+    }
+
+#if MC_VER >= MC_1_21_6
+    @Unique
+	private boolean insertWouldOverflow(String string, MultilineTextFieldAccessor mltfaccessor) {
         if (!string.isEmpty() || mltfaccessor.bookTweaks$hasSelection()) {
 			String string2 = mltfaccessor.bookTweaks$truncateInsertionText(StringUtil.filterText(string, true));
             int beginIndex = Math.min(mltfaccessor.bookTweaks$getSelectCursor(), mltfaccessor.bookTweaks$getCursor());
             int endIndex = Math.max(mltfaccessor.bookTweaks$getSelectCursor(), mltfaccessor.bookTweaks$getCursor());
 			String string3 = new StringBuilder(mltfaccessor.bookTweaks$getValue()).replace(beginIndex, endIndex, string2).toString();
 			return mltfaccessor.bookTweaks$overflowsLineLimit(string3);
-		}
+        }
         return false;
+    }
+#else
+    @Unique
+    private boolean bookTweaks$legacyInsertWouldOverflow(String string) {
+        String filtered = StringUtil.filterText(string, true);
+        int beginIndex = Math.min(pageEdit.getSelectionPos(), pageEdit.getCursorPos());
+        int endIndex = Math.max(pageEdit.getSelectionPos(), pageEdit.getCursorPos());
+        String candidate = new StringBuilder(getCurrentPageText()).replace(beginIndex, endIndex, filtered).toString();
+        return candidate.length() > 1024 || Minecraft.getInstance().font.wordWrapHeight(candidate, 114) > 128;
+    }
+
+    @Unique
+    private int bookTweaks$getLegacyLineAtCursor() {
+        int cursor = pageEdit.getCursorPos();
+        int[] lineStarts = bookTweaks$getLegacyLineStarts();
+        int line = Arrays.binarySearch(lineStarts, cursor);
+        if (line < 0) {
+            line = -line - 2;
+        }
+        return Math.max(0, line);
+    }
+
+    @Unique
+    private int bookTweaks$getLegacyLineCount() {
+        try {
+            Object[] lines = (Object[]) bookTweaks$getLegacyLinesField().get(bookTweaks$getLegacyDisplayCache());
+            return Math.max(1, lines.length);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to read BookEditScreen display lines", e);
+        }
+    }
+
+    @Unique
+    private int[] bookTweaks$getLegacyLineStarts() {
+        try {
+            return (int[]) bookTweaks$getLegacyLineStartsField().get(bookTweaks$getLegacyDisplayCache());
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to read BookEditScreen line starts", e);
+        }
+    }
+
+    @Unique
+    private Object bookTweaks$getLegacyDisplayCache() {
+        try {
+            return bookTweaks$getLegacyDisplayCacheField().get(this);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException("Failed to read BookEditScreen display cache", e);
+        }
+    }
+
+    @Unique
+    private Field bookTweaks$getLegacyDisplayCacheField() {
+        if (bookTweaks$legacyDisplayCacheField == null) {
+            try {
+                bookTweaks$legacyDisplayCacheField = this.getClass().getDeclaredField("displayCache");
+                bookTweaks$legacyDisplayCacheField.setAccessible(true);
+            } catch (NoSuchFieldException e) {
+                throw new RuntimeException("Failed to locate BookEditScreen displayCache field", e);
+            }
+        }
+        return bookTweaks$legacyDisplayCacheField;
+    }
+
+    @Unique
+    private Field bookTweaks$getLegacyLineStartsField() {
+        if (bookTweaks$legacyLineStartsField == null) {
+            try {
+                bookTweaks$legacyLineStartsField = bookTweaks$getLegacyDisplayCache().getClass().getDeclaredField("lineStarts");
+                bookTweaks$legacyLineStartsField.setAccessible(true);
+            } catch (NoSuchFieldException e) {
+                throw new RuntimeException("Failed to locate BookEditScreen lineStarts field", e);
+            }
+        }
+        return bookTweaks$legacyLineStartsField;
+    }
+
+    @Unique
+    private Field bookTweaks$getLegacyLinesField() {
+        if (bookTweaks$legacyLinesField == null) {
+            try {
+                bookTweaks$legacyLinesField = bookTweaks$getLegacyDisplayCache().getClass().getDeclaredField("lines");
+                bookTweaks$legacyLinesField.setAccessible(true);
+            } catch (NoSuchFieldException e) {
+                throw new RuntimeException("Failed to locate BookEditScreen lines field", e);
+            }
+        }
+        return bookTweaks$legacyLinesField;
+    }
+
+    @Unique
+    private int bookTweaks$getLegacyPreviousWordBeginIndex(String value, int cursor) {
+        if (value.isEmpty()) {
+            return 0;
+        }
+
+        int i = Math.max(0, Math.min(cursor, value.length() - 1));
+        while (i > 0 && Character.isWhitespace(value.charAt(i - 1))) {
+            i--;
+        }
+        while (i > 0 && !Character.isWhitespace(value.charAt(i - 1))) {
+            i--;
+        }
+        return i;
+    }
+
+    @Unique
+    private int bookTweaks$getLegacyPreviousWordEndIndex(String value, int cursor) {
+        if (value.isEmpty()) {
+            return 0;
+        }
+
+        int i = bookTweaks$getLegacyPreviousWordBeginIndex(value, cursor);
+        while (i < value.length() && !Character.isWhitespace(value.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+#endif
+
+    @Unique
+    private void bookTweaks$saveChangesForCurrentVersion() {
+#if MC_VER >= MC_1_21_6
+        saveChanges();
+#else
+        saveChanges(false);
+#endif
     }
 }
