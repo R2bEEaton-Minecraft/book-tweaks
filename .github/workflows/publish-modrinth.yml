@@ -65,6 +65,7 @@ jobs:
           - 1.21.11
           - 26.1
           - 26.1.1
+          - 26.1.2
     name: publish ${{ matrix.mc_ver }}
     env:
       MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
@@ -84,6 +85,29 @@ jobs:
         with:
           java-version: '25'
           distribution: 'microsoft'
+
+      - name: resolve Modrinth project id
+        id: project
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          response="$(
+            curl --fail --silent --show-error \
+              -H "Authorization: $MODRINTH_TOKEN" \
+              -H "User-Agent: github.com/${{ github.repository }}" \
+              "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}"
+          )"
+
+          resolved_project_id="$(jq -r '.id' <<<"$response")"
+          if [ -z "$resolved_project_id" ] || [ "$resolved_project_id" = "null" ]; then
+            echo "Failed to resolve Modrinth project ID from MODRINTH_PROJECT_ID secret." >&2
+            exit 1
+          fi
+
+          echo "project_id=$resolved_project_id" >> "$GITHUB_OUTPUT"
+          echo "Resolved Modrinth project ID: $resolved_project_id" >> "$GITHUB_STEP_SUMMARY"
 
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
@@ -123,7 +147,7 @@ jobs:
               --data-urlencode 'loaders=["fabric"]' \
               --data-urlencode 'include_changelog=false' \
               --data-urlencode 'game_versions=["${{ matrix.mc_ver }}"]' \
-              "https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_ID}/version"
+              "https://api.modrinth.com/v2/project/${{ steps.project.outputs.project_id }}/version"
           )"
 
           if jq -e --arg version_number '${{ steps.meta.outputs.version_number }}' '.[] | select(.version_number == $version_number)' >/dev/null <<<"$response"; then
@@ -164,7 +188,7 @@ jobs:
               --arg changelog '${{ inputs.changelog }}' \
               --arg version_type '${{ inputs.version_type }}' \
               --arg status '${{ inputs.version_status }}' \
-              --arg project_id "$MODRINTH_PROJECT_ID" \
+              --arg project_id '${{ steps.project.outputs.project_id }}' \
               --arg game_version '${{ matrix.mc_ver }}' \
               '{
                 name: $name,
@@ -182,14 +206,25 @@ jobs:
               }'
           )"
 
-          response="$(
-            curl --fail-with-body --silent --show-error \
+          response_file="$(mktemp)"
+          http_code="$(
+            curl --silent --show-error \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
               -H "Authorization: $MODRINTH_TOKEN" \
               -H "User-Agent: github.com/${{ github.repository }}" \
               --form-string "data=$payload" \
               -F "file=@${{ steps.build.outputs.jar_path }}" \
               "https://api.modrinth.com/v2/version"
           )"
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Modrinth upload failed with HTTP $http_code" >&2
+            cat "$response_file" >&2
+            exit 1
+          fi
+
+          response="$(cat "$response_file")"
 
           uploaded_id="$(jq -r '.id' <<<"$response")"
           uploaded_name="$(jq -r '.name' <<<"$response")"

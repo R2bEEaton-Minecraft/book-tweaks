@@ -27,6 +27,7 @@ jobs:
           - 1.21.11
           - 26.1
           - 26.1.1
+          - 26.1.2
     steps:
       - name: checkout repository
         uses: actions/checkout@v4

@@ -26,6 +26,7 @@ This repository currently builds for:
 - `1.21.11`
 - `26.1`
 - `26.1.1`
+- `26.1.2`
 
 Each Minecraft version is built as its own jar. There is no single universal jar for the full range.
 
@@ -41,7 +42,7 @@ Build a specific Minecraft target with:
 ```powershell
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-25.0.0.36-hotspot'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
-.\gradlew.bat clean build -Pmc_ver=1.21.11
+.\gradlew.bat clean build '-Pmc_ver=1.21.11'
 ```
 
 Replace `1.21.11` with any supported target version.
@@ -51,7 +52,7 @@ Run a client for a specific target with:
 ```powershell
 $env:JAVA_HOME='C:\Program Files\Eclipse Adoptium\jdk-25.0.0.36-hotspot'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
-.\gradlew.bat runClient -Pmc_ver=26.1.1
+.\gradlew.bat runClient '-Pmc_ver=26.1.2'
 ```
 
 ## Release Files
@@ -61,6 +62,6 @@ Built jars are written to `build/libs/`.
 Upload the normal jar to Modrinth, for example:
 
 - `book-tweaks-1.2.0-1.21.11.jar`
-- `book-tweaks-1.2.0-26.1.1.jar`
+- `book-tweaks-1.2.0-26.1.2.jar`
 
 Do not upload the `-sources.jar` files.
