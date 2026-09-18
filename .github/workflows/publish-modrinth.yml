@@ -66,6 +66,8 @@ jobs:
           - 26.1
           - 26.1.1
           - 26.1.2
+          - 26.2
+          - 26.3
     name: publish ${{ matrix.mc_ver }}
     env:
       MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
